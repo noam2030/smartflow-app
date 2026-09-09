@@ -57,3 +57,7 @@ const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-
 export const getIssueParamsSchema = z.object({
   id: z.string().regex(UUID_REGEX, 'The provided issue ID must be a valid UUID.'),
 });
+
+export const updateIssueStatusSchema = z.object({
+  status: issueStatusSchema,
+});

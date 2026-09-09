@@ -36,6 +36,10 @@ export interface CreateIssueRequest {
   description: string;
 }
 
+export interface UpdateIssueStatusRequest {
+  status: IssueStatus;
+}
+
 export interface PaginationMeta {
   total: number;
   page: number;

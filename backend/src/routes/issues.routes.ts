@@ -4,6 +4,7 @@ import {
   createIssueSchema,
   getIssueParamsSchema,
   getIssuesQuerySchema,
+  updateIssueStatusSchema,
 } from '../schemas/issues.schemas.js';
 import {
   InvalidIdFormatError,
@@ -85,5 +86,52 @@ export const issuesRoutes: FastifyPluginAsync<IssuesRoutesOptions> = async (
       },
     },
     controller.getIssueById
+  );
+
+  // Helper validation for status updates
+  const validateUpdateStatus = async (request: any) => {
+    const paramsResult = getIssueParamsSchema.safeParse(request.params);
+    if (!paramsResult.success) {
+      const details = paramsResult.error.issues.map((i) => ({
+        field: i.path.join('.'),
+        message: i.message,
+      }));
+      throw new InvalidIdFormatError(
+        'The provided issue ID must be a valid UUID.',
+        details
+      );
+    }
+    request.params = paramsResult.data;
+
+    const bodyResult = updateIssueStatusSchema.safeParse(request.body);
+    if (!bodyResult.success) {
+      const details = bodyResult.error.issues.map((i) => ({
+        field: i.path.join('.'),
+        message: i.message,
+      }));
+      throw new ValidationError(
+        bodyResult.error.issues[0]?.message || 'Invalid request payload. Status must be OPEN, IN_PROGRESS, RESOLVED, or CLOSED.',
+        details
+      );
+    }
+    request.body = bodyResult.data;
+  };
+
+  // PATCH /api/issues/:id/status
+  fastify.patch(
+    '/api/issues/:id/status',
+    {
+      preValidation: validateUpdateStatus,
+    },
+    controller.updateIssueStatus
+  );
+
+  // PATCH /api/issues/:id
+  fastify.patch(
+    '/api/issues/:id',
+    {
+      preValidation: validateUpdateStatus,
+    },
+    controller.updateIssueStatus
   );
 };

@@ -1,17 +1,35 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Issue } from '../types/issue';
+import { Issue, IssueStatus } from '../types/issue';
 import { CategoryBadge, ConfidenceBadge, StatusBadge, UrgencyBadge } from './IssueBadge';
-import { ChevronDown, ChevronUp, Clock, Lightbulb, Sparkles } from 'lucide-react';
+import { ChevronDown, ChevronUp, Clock, Lightbulb, Loader2, Sparkles } from 'lucide-react';
 
 interface IssueCardProps {
   issue: Issue;
   className?: string;
+  onStatusChange?: (issueId: string, newStatus: IssueStatus) => Promise<void>;
 }
 
-export const IssueCard: React.FC<IssueCardProps> = ({ issue, className = '' }) => {
+export const IssueCard: React.FC<IssueCardProps> = ({
+  issue,
+  className = '',
+  onStatusChange,
+}) => {
   const [isExpanded, setIsExpanded] = useState(false);
+  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
+
+  const handleStatusSelect = async (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const newStatus = e.target.value as IssueStatus;
+    if (newStatus === issue.status || !onStatusChange) return;
+
+    try {
+      setIsUpdatingStatus(true);
+      await onStatusChange(issue.id, newStatus);
+    } finally {
+      setIsUpdatingStatus(false);
+    }
+  };
 
   const formatDate = (isoString: string) => {
     try {
@@ -48,9 +66,43 @@ export const IssueCard: React.FC<IssueCardProps> = ({ issue, className = '' }) =
           </h3>
         </div>
 
-        <div className="flex items-center text-xs text-slate-400 dark:text-slate-500 whitespace-nowrap shrink-0">
-          <Clock className="w-3.5 h-3.5 mr-1" />
-          <span>{formatDate(issue.createdAt)}</span>
+        <div className="flex flex-row sm:flex-col sm:items-end justify-between sm:justify-start gap-2 shrink-0 pt-0.5">
+          <div className="flex items-center text-xs text-slate-400 dark:text-slate-500 whitespace-nowrap">
+            <Clock className="w-3.5 h-3.5 mr-1" />
+            <span>{formatDate(issue.createdAt)}</span>
+          </div>
+
+          <div className="flex items-center space-x-1.5">
+            <label
+              htmlFor={`status-select-${issue.id}`}
+              className="text-xs text-slate-500 dark:text-slate-400 font-medium"
+            >
+              Status:
+            </label>
+            <div className="relative inline-flex items-center">
+              <select
+                id={`status-select-${issue.id}`}
+                value={issue.status}
+                disabled={isUpdatingStatus}
+                onChange={handleStatusSelect}
+                className="text-xs font-medium rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-200 py-1 pl-2.5 pr-6 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer disabled:opacity-50 appearance-none"
+                data-testid={`status-select-${issue.id}`}
+                aria-label={`Change status for ${issue.title}`}
+              >
+                <option value="OPEN">Open</option>
+                <option value="IN_PROGRESS">In Progress</option>
+                <option value="RESOLVED">Resolved</option>
+                <option value="CLOSED">Closed</option>
+              </select>
+              <div className="pointer-events-none absolute right-1.5 flex items-center">
+                {isUpdatingStatus ? (
+                  <Loader2 className="w-3 h-3 text-indigo-500 animate-spin" />
+                ) : (
+                  <ChevronDown className="w-3 h-3 text-slate-400" />
+                )}
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 

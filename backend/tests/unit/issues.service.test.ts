@@ -111,4 +111,30 @@ describe('IssuesService', () => {
     const urgencyDesc = await service.getIssues({ sortBy: 'urgency', sortOrder: 'desc' });
     expect(urgencyDesc.items[0].urgency).toBe('CRITICAL');
   });
+
+  it('updates an issue status successfully', async () => {
+    const created = await service.createIssue({
+      title: 'Task status test',
+      description: 'Testing updating status from OPEN to IN_PROGRESS and RESOLVED',
+    });
+
+    expect(created.status).toBe('OPEN');
+
+    const inProgress = await service.updateIssueStatus(created.id, 'IN_PROGRESS');
+    expect(inProgress.id).toBe(created.id);
+    expect(inProgress.status).toBe('IN_PROGRESS');
+    expect(new Date(inProgress.updatedAt).getTime()).toBeGreaterThanOrEqual(new Date(created.createdAt).getTime());
+
+    const resolved = await service.updateIssueStatus(created.id, 'RESOLVED');
+    expect(resolved.status).toBe('RESOLVED');
+
+    const closed = await service.updateIssueStatus(created.id, 'CLOSED');
+    expect(closed.status).toBe('CLOSED');
+  });
+
+  it('throws NotFoundError when updating status of non-existent issue', async () => {
+    await expect(
+      service.updateIssueStatus('00000000-0000-0000-0000-000000000000', 'RESOLVED')
+    ).rejects.toThrow(NotFoundError);
+  });
 });

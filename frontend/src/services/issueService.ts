@@ -6,6 +6,7 @@ import {
   IssueListResponse,
   IssueQueryParams,
   IssueResponse,
+  IssueStatus,
   PaginationMeta,
 } from '../types/issue';
 
@@ -115,6 +116,41 @@ export const issueService = {
       headers: {
         Accept: 'application/json',
       },
+    });
+
+    const data = await response.json().catch(() => null);
+
+    if (!response.ok) {
+      if (data && 'error' in data) {
+        const errorRes = data as ErrorResponse;
+        throw new ApiError(errorRes.error);
+      }
+      throw new ApiError({
+        code: 'HTTP_ERROR',
+        message: response.statusText || `Request failed with status ${response.status}`,
+        statusCode: response.status,
+      });
+    }
+
+    const issueResponse = data as IssueResponse;
+    return issueResponse.data;
+  },
+
+  /**
+   * Update the status of an issue.
+   * Sends a PATCH request to /api/issues/:id/status.
+   */
+  async updateIssueStatus(id: string, status: IssueStatus): Promise<Issue> {
+    const baseUrl = getApiBaseUrl();
+    const url = `${baseUrl}/api/issues/${encodeURIComponent(id)}/status`;
+
+    const response = await fetch(url, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+      },
+      body: JSON.stringify({ status }),
     });
 
     const data = await response.json().catch(() => null);

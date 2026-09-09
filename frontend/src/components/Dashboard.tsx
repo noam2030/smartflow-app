@@ -2,7 +2,7 @@
 
 import React, { useCallback, useEffect, useState } from 'react';
 import { issueService } from '../services/issueService';
-import { ApiError, Issue, IssueQueryParams, PaginationMeta } from '../types/issue';
+import { ApiError, Issue, IssueQueryParams, IssueStatus, PaginationMeta } from '../types/issue';
 import { IssueCard } from './IssueCard';
 import { IssueFilters } from './IssueFilters';
 import { Pagination } from './Pagination';
@@ -101,6 +101,35 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
   const handlePageChange = (newPage: number) => {
     handleFilterChange({ page: newPage });
+  };
+
+  const handleStatusChange = async (issueId: string, newStatus: IssueStatus) => {
+    const previousIssues = [...issues];
+    // Optimistic update
+    setIssues((prev) =>
+      prev.map((issue) =>
+        issue.id === issueId
+          ? { ...issue, status: newStatus, updatedAt: new Date().toISOString() }
+          : issue
+      )
+    );
+
+    try {
+      const updated = await issueService.updateIssueStatus(issueId, newStatus);
+      setIssues((prev) =>
+        prev.map((issue) => (issue.id === issueId ? updated : issue))
+      );
+    } catch (err: unknown) {
+      setIssues(previousIssues);
+      const message =
+        err instanceof ApiError
+          ? err.message
+          : err instanceof Error
+          ? err.message
+          : 'Failed to update issue status.';
+      setError({ message });
+      throw err;
+    }
   };
 
   // Quick stats computed from current items
@@ -298,7 +327,11 @@ export const Dashboard: React.FC<DashboardProps> = ({
       {!isLoading && !error && issues.length > 0 && (
         <div className="space-y-4" data-testid="issues-list">
           {issues.map((issue) => (
-            <IssueCard key={issue.id} issue={issue} />
+            <IssueCard
+              key={issue.id}
+              issue={issue}
+              onStatusChange={handleStatusChange}
+            />
           ))}
 
           {/* Pagination */}

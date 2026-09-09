@@ -323,4 +323,92 @@ describe('Issues API Integration Tests', () => {
       expect(body.error.message).toBe(`Issue with ID '${nonExistentId}' was not found.`);
     });
   });
+
+  describe('PATCH /api/issues/:id/status', () => {
+    it('updates status of an existing issue to IN_PROGRESS and RESOLVED (200)', async () => {
+      const createRes = await app.inject({
+        method: 'POST',
+        url: '/api/issues',
+        payload: {
+          title: 'Database connection leak in production pool',
+          description: 'Connection pool exhausted under moderate load, causing connection timeouts for clients.',
+        },
+      });
+      const created = JSON.parse(createRes.body).data;
+
+      const patchRes = await app.inject({
+        method: 'PATCH',
+        url: `/api/issues/${created.id}/status`,
+        payload: { status: 'IN_PROGRESS' },
+      });
+
+      expect(patchRes.statusCode).toBe(200);
+      const patchBody = JSON.parse(patchRes.body);
+      expect(patchBody.success).toBe(true);
+      expect(patchBody.data.id).toBe(created.id);
+      expect(patchBody.data.status).toBe('IN_PROGRESS');
+
+      // Update to RESOLVED using alias endpoint
+      const aliasRes = await app.inject({
+        method: 'PATCH',
+        url: `/api/issues/${created.id}`,
+        payload: { status: 'RESOLVED' },
+      });
+
+      expect(aliasRes.statusCode).toBe(200);
+      const aliasBody = JSON.parse(aliasRes.body);
+      expect(aliasBody.data.status).toBe('RESOLVED');
+    });
+
+    it('returns 400 VALIDATION_ERROR when status value is invalid', async () => {
+      const createRes = await app.inject({
+        method: 'POST',
+        url: '/api/issues',
+        payload: {
+          title: 'Testing invalid status value payload',
+          description: 'Description long enough to pass validation schema checks.',
+        },
+      });
+      const created = JSON.parse(createRes.body).data;
+
+      const patchRes = await app.inject({
+        method: 'PATCH',
+        url: `/api/issues/${created.id}/status`,
+        payload: { status: 'INVALID_STATUS' },
+      });
+
+      expect(patchRes.statusCode).toBe(400);
+      const body = JSON.parse(patchRes.body);
+      expect(body.success).toBe(false);
+      expect(body.error.code).toBe('VALIDATION_ERROR');
+      expect(body.error.statusCode).toBe(400);
+    });
+
+    it('returns 400 INVALID_ID_FORMAT when ID is not a valid UUID', async () => {
+      const patchRes = await app.inject({
+        method: 'PATCH',
+        url: '/api/issues/not-a-uuid/status',
+        payload: { status: 'CLOSED' },
+      });
+
+      expect(patchRes.statusCode).toBe(400);
+      const body = JSON.parse(patchRes.body);
+      expect(body.success).toBe(false);
+      expect(body.error.code).toBe('INVALID_ID_FORMAT');
+    });
+
+    it('returns 404 ISSUE_NOT_FOUND when ID does not exist', async () => {
+      const nonExistentId = '3fa85f64-5717-4562-b3fc-2c963f66afa6';
+      const patchRes = await app.inject({
+        method: 'PATCH',
+        url: `/api/issues/${nonExistentId}/status`,
+        payload: { status: 'RESOLVED' },
+      });
+
+      expect(patchRes.statusCode).toBe(404);
+      const body = JSON.parse(patchRes.body);
+      expect(body.success).toBe(false);
+      expect(body.error.code).toBe('ISSUE_NOT_FOUND');
+    });
+  });
 });

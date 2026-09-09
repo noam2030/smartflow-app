@@ -327,6 +327,56 @@ paths:
                   statusCode: 500
                   details: []
 
+  /api/issues/{id}/status:
+    patch:
+      tags:
+        - Issues
+      summary: Update the lifecycle status of an issue
+      description: Updates the status of an existing issue (OPEN, IN_PROGRESS, RESOLVED, CLOSED).
+      operationId: updateIssueStatus
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Unique identifier of the issue (UUID)
+          schema:
+            type: string
+            format: uuid
+          example: 3fa85f64-5717-4562-b3fc-2c963f66afa6
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateIssueStatusRequest'
+            example:
+              status: IN_PROGRESS
+      responses:
+        '200':
+          description: Issue status successfully updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IssueResponse'
+        '400':
+          description: Invalid request payload or invalid UUID
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Issue not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
 components:
   schemas:
     IssueCategory:
@@ -465,6 +515,15 @@ components:
           example: >-
             When users attempt to submit payment on the checkout page, the request times out
             after 30 seconds and returns a 504 gateway timeout. Customers are completely unable to complete purchases.
+
+    UpdateIssueStatusRequest:
+      type: object
+      description: Request payload for updating issue lifecycle status
+      required:
+        - status
+      properties:
+        status:
+          $ref: '#/components/schemas/IssueStatus'
 
     IssueResponse:
       type: object

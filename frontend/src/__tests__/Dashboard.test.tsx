@@ -161,4 +161,42 @@ describe('Dashboard Component', () => {
     expect(screen.getByText(/Direct revenue impact./i)).toBeInTheDocument();
     expect(screen.getByText(/Alert on-call engineering team./i)).toBeInTheDocument();
   });
+
+  it('updates issue status when selecting a new status', async () => {
+    const user = userEvent.setup();
+    (issueService.getIssues as jest.Mock).mockResolvedValue({
+      items: [mockIssues[0]],
+      pagination: {
+        total: 1,
+        page: 1,
+        limit: 10,
+        totalPages: 1,
+        hasNextPage: false,
+        hasPrevPage: false,
+      },
+    });
+
+    const updatedIssue: Issue = {
+      ...mockIssues[0],
+      status: 'RESOLVED',
+      updatedAt: '2026-09-09T12:00:00.000Z',
+    };
+    (issueService.updateIssueStatus as jest.Mock).mockResolvedValue(updatedIssue);
+
+    render(<Dashboard />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('status-select-issue-1')).toBeInTheDocument();
+    });
+
+    const statusSelect = screen.getByTestId('status-select-issue-1');
+    expect(statusSelect).toHaveValue('OPEN');
+
+    await user.selectOptions(statusSelect, 'RESOLVED');
+
+    expect(issueService.updateIssueStatus).toHaveBeenCalledWith('issue-1', 'RESOLVED');
+    await waitFor(() => {
+      expect(statusSelect).toHaveValue('RESOLVED');
+    });
+  });
 });

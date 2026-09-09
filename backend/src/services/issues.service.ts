@@ -5,6 +5,7 @@ import type {
   GetIssuesQuery,
   Issue,
   IssueListResponseData,
+  IssueStatus,
   PaginationMeta,
 } from '../types/issues.js';
 import { NotFoundError } from '../errors/app-error.js';
@@ -14,6 +15,7 @@ export interface IIssuesService {
   createIssue(data: CreateIssueRequest): Promise<Issue>;
   getIssues(query: GetIssuesQuery): Promise<IssueListResponseData>;
   getIssueById(id: string): Promise<Issue>;
+  updateIssueStatus(id: string, status: IssueStatus): Promise<Issue>;
 }
 
 interface IssueRow {
@@ -190,6 +192,22 @@ export class IssuesService implements IIssuesService {
     }
 
     return this.mapRowToIssue(row);
+  }
+
+  async updateIssueStatus(id: string, status: IssueStatus): Promise<Issue> {
+    // Verify issue exists first
+    await this.getIssueById(id);
+
+    const now = new Date().toISOString();
+    const stmt = this.db.prepare(`
+      UPDATE issues
+      SET status = ?, updated_at = ?
+      WHERE id = ?
+    `);
+
+    stmt.run(status, now, id);
+
+    return this.getIssueById(id);
   }
 
   private mapRowToIssue(row: IssueRow): Issue {

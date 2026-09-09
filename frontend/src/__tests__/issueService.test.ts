@@ -194,4 +194,50 @@ describe('issueService', () => {
       expect(result.id).toBe('3fa85f64-5717-4562-b3fc-2c963f66afa6');
     });
   });
+
+  describe('updateIssueStatus', () => {
+    it('sends PATCH request to /api/issues/:id/status and returns updated issue', async () => {
+      const updatedMockIssue: Issue = {
+        ...mockIssue,
+        status: 'IN_PROGRESS',
+        updatedAt: '2026-09-09T11:00:00.000Z',
+      };
+
+      global.fetch = jest.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          success: true,
+          data: updatedMockIssue,
+        }),
+      });
+
+      const result = await issueService.updateIssueStatus(mockIssue.id, 'IN_PROGRESS');
+
+      expect(global.fetch).toHaveBeenCalledTimes(1);
+      const [calledUrl, calledOptions] = (global.fetch as jest.Mock).mock.calls[0];
+      expect(calledUrl).toBe(`/api/issues/${mockIssue.id}/status`);
+      expect(calledOptions.method).toBe('PATCH');
+      expect(calledOptions.headers['Content-Type']).toBe('application/json');
+      expect(JSON.parse(calledOptions.body)).toEqual({ status: 'IN_PROGRESS' });
+      expect(result.status).toBe('IN_PROGRESS');
+    });
+
+    it('throws ApiError when PATCH status returns error', async () => {
+      global.fetch = jest.fn().mockResolvedValue({
+        ok: false,
+        status: 404,
+        json: async () => ({
+          success: false,
+          error: {
+            code: 'ISSUE_NOT_FOUND',
+            message: 'Issue not found',
+            statusCode: 404,
+          },
+        }),
+      });
+
+      await expect(issueService.updateIssueStatus('non-existent-id', 'RESOLVED')).rejects.toThrow(ApiError);
+    });
+  });
 });
