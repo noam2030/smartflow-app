@@ -1,0 +1,591 @@
+openapi: 3.0.3
+info:
+  title: SmartFlow API
+  description: >-
+    SmartFlow is an intelligent issue tracking API that ingests textual issue reports,
+    analyzes and classifies them (category and urgency) using AI, and persists them into a database.
+  version: 1.0.0
+servers:
+  - url: http://localhost:3000
+    description: Local Development Server
+
+tags:
+  - name: Issues
+    description: Issue reporting, AI classification, and retrieval operations
+
+paths:
+  /api/issues:
+    post:
+      tags:
+        - Issues
+      summary: Submit a new issue report for AI classification and storage
+      description: >-
+        Accepts a title and free-text description of an issue. The system runs an AI analysis
+        to classify its category and urgency, calculates confidence scores, and persists the
+        issue in the database before returning the enriched record.
+      operationId: createIssue
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateIssueRequest'
+            example:
+              title: Production checkout fails on credit card submission
+              description: >-
+                When users attempt to submit payment on the checkout page, the request times out
+                after 30 seconds and returns a 504 gateway timeout. Customers are completely unable to complete purchases.
+      responses:
+        '201':
+          description: Issue successfully analyzed by AI and created in the database
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IssueResponse'
+              example:
+                success: true
+                data:
+                  id: 3fa85f64-5717-4562-b3fc-2c963f66afa6
+                  title: Production checkout fails on credit card submission
+                  description: >-
+                    When users attempt to submit payment on the checkout page, the request times out
+                    after 30 seconds and returns a 504 gateway timeout. Customers are completely unable to complete purchases.
+                  status: OPEN
+                  category: BUG
+                  urgency: CRITICAL
+                  aiAnalysis:
+                    category: BUG
+                    urgency: CRITICAL
+                    confidenceScore: 0.98
+                    summary: Critical payment gateway timeout blocking all user checkout transactions.
+                    reasoning: Direct financial and revenue impact affecting all customers attempting to checkout.
+                    suggestedAction: Immediately alert on-call engineering team and verify payment provider webhook/gateway latency.
+                  createdAt: '2026-09-09T10:30:00.000Z'
+                  updatedAt: '2026-09-09T10:30:00.000Z'
+        '400':
+          description: Validation error in the request payload
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                success: false
+                error:
+                  code: VALIDATION_ERROR
+                  message: Invalid request payload. Title and description are required.
+                  statusCode: 400
+                  details:
+                    - field: title
+                      message: title must be at least 3 characters long
+        '422':
+          description: Unprocessable entity / AI processing failure
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                success: false
+                error:
+                  code: AI_ANALYSIS_FAILED
+                  message: The AI classification service failed to evaluate the report text.
+                  statusCode: 422
+                  details: []
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                success: false
+                error:
+                  code: INTERNAL_SERVER_ERROR
+                  message: An unexpected error occurred while saving the issue.
+                  statusCode: 500
+                  details: []
+
+    get:
+      tags:
+        - Issues
+      summary: Retrieve all issues with filtering and sorting
+      description: >-
+        Retrieves a paginated list of issues from the database with support for filtering by
+        category, urgency, status, and search query, as well as customizable sorting.
+      operationId: getIssues
+      parameters:
+        - name: category
+          in: query
+          required: false
+          description: Filter issues by AI-classified category
+          schema:
+            $ref: '#/components/schemas/IssueCategory'
+          example: BUG
+        - name: urgency
+          in: query
+          required: false
+          description: Filter issues by AI-classified urgency level
+          schema:
+            $ref: '#/components/schemas/IssueUrgency'
+          example: CRITICAL
+        - name: status
+          in: query
+          required: false
+          description: Filter issues by lifecycle status
+          schema:
+            $ref: '#/components/schemas/IssueStatus'
+          example: OPEN
+        - name: search
+          in: query
+          required: false
+          description: Text search term matching against title or description
+          schema:
+            type: string
+          example: checkout
+        - name: sortBy
+          in: query
+          required: false
+          description: Field name to sort by
+          schema:
+            type: string
+            enum:
+              - createdAt
+              - updatedAt
+              - urgency
+              - title
+            default: createdAt
+          example: createdAt
+        - name: sortOrder
+          in: query
+          required: false
+          description: Sort direction
+          schema:
+            type: string
+            enum:
+              - asc
+              - desc
+            default: desc
+          example: desc
+        - name: page
+          in: query
+          required: false
+          description: Page number for pagination
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+          example: 1
+        - name: limit
+          in: query
+          required: false
+          description: Number of records to return per page
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+          example: 20
+      responses:
+        '200':
+          description: A paginated list of issues matching the filter criteria
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IssueListResponse'
+              example:
+                success: true
+                data:
+                  items:
+                    - id: 3fa85f64-5717-4562-b3fc-2c963f66afa6
+                      title: Production checkout fails on credit card submission
+                      description: When users attempt to submit payment, the request times out after 30 seconds.
+                      status: OPEN
+                      category: BUG
+                      urgency: CRITICAL
+                      aiAnalysis:
+                        category: BUG
+                        urgency: CRITICAL
+                        confidenceScore: 0.98
+                        summary: Critical payment gateway timeout blocking user checkout.
+                        reasoning: Direct financial and revenue impact affecting all customers.
+                        suggestedAction: Alert on-call team to verify gateway latency.
+                      createdAt: '2026-09-09T10:30:00.000Z'
+                      updatedAt: '2026-09-09T10:30:00.000Z'
+                  pagination:
+                    total: 42
+                    page: 1
+                    limit: 20
+                    totalPages: 3
+                    hasNextPage: true
+                    hasPrevPage: false
+        '400':
+          description: Invalid query parameters provided
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                success: false
+                error:
+                  code: INVALID_QUERY_PARAMETER
+                  message: Query parameter 'page' must be greater than or equal to 1.
+                  statusCode: 400
+                  details: []
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                success: false
+                error:
+                  code: INTERNAL_SERVER_ERROR
+                  message: An unexpected error occurred while fetching issues.
+                  statusCode: 500
+                  details: []
+
+  /api/issues/{id}:
+    get:
+      tags:
+        - Issues
+      summary: Retrieve a specific issue by ID
+      description: Retrieves the complete record of an issue by its unique identifier, including AI classification analysis.
+      operationId: getIssueById
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Unique identifier of the issue (UUID)
+          schema:
+            type: string
+            format: uuid
+          example: 3fa85f64-5717-4562-b3fc-2c963f66afa6
+      responses:
+        '200':
+          description: Issue found and retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IssueResponse'
+              example:
+                success: true
+                data:
+                  id: 3fa85f64-5717-4562-b3fc-2c963f66afa6
+                  title: Production checkout fails on credit card submission
+                  description: >-
+                    When users attempt to submit payment on the checkout page, the request times out
+                    after 30 seconds and returns a 504 gateway timeout. Customers are completely unable to complete purchases.
+                  status: OPEN
+                  category: BUG
+                  urgency: CRITICAL
+                  aiAnalysis:
+                    category: BUG
+                    urgency: CRITICAL
+                    confidenceScore: 0.98
+                    summary: Critical payment gateway timeout blocking all user checkout transactions.
+                    reasoning: Direct financial and revenue impact affecting all customers attempting to checkout.
+                    suggestedAction: Immediately alert on-call engineering team and verify payment provider webhook/gateway latency.
+                  createdAt: '2026-09-09T10:30:00.000Z'
+                  updatedAt: '2026-09-09T10:30:00.000Z'
+        '400':
+          description: Invalid ID format
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                success: false
+                error:
+                  code: INVALID_ID_FORMAT
+                  message: The provided issue ID must be a valid UUID.
+                  statusCode: 400
+                  details: []
+        '404':
+          description: Issue not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                success: false
+                error:
+                  code: ISSUE_NOT_FOUND
+                  message: Issue with ID '3fa85f64-5717-4562-b3fc-2c963f66afa6' was not found.
+                  statusCode: 404
+                  details: []
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                success: false
+                error:
+                  code: INTERNAL_SERVER_ERROR
+                  message: An unexpected error occurred while retrieving the issue.
+                  statusCode: 500
+                  details: []
+
+components:
+  schemas:
+    IssueCategory:
+      type: string
+      description: Category classified by AI based on the issue content
+      enum:
+        - BUG
+        - FEATURE_REQUEST
+        - PERFORMANCE
+        - SECURITY
+        - BILLING
+        - GENERAL_INQUIRY
+      example: BUG
+
+    IssueUrgency:
+      type: string
+      description: Urgency level determined by AI assessment of impact and priority
+      enum:
+        - LOW
+        - MEDIUM
+        - HIGH
+        - CRITICAL
+      example: CRITICAL
+
+    IssueStatus:
+      type: string
+      description: Current status of the issue in the workflow
+      enum:
+        - OPEN
+        - IN_PROGRESS
+        - RESOLVED
+        - CLOSED
+      example: OPEN
+
+    AIAnalysis:
+      type: object
+      description: AI-generated classification and analysis details
+      required:
+        - category
+        - urgency
+        - confidenceScore
+        - summary
+      properties:
+        category:
+          $ref: '#/components/schemas/IssueCategory'
+        urgency:
+          $ref: '#/components/schemas/IssueUrgency'
+        confidenceScore:
+          type: number
+          format: float
+          minimum: 0.0
+          maximum: 1.0
+          description: Confidence score of the AI classification between 0.0 and 1.0
+          example: 0.98
+        summary:
+          type: string
+          description: Concise one-sentence summary generated by the AI
+          example: Critical payment gateway timeout blocking user checkout transactions.
+        reasoning:
+          type: string
+          description: Explanation for the determined category and urgency level
+          example: Direct financial and revenue impact affecting all customers.
+        suggestedAction:
+          type: string
+          description: Suggested remediation step or team assignment
+          example: Alert on-call team to verify payment provider gateway latency.
+
+    Issue:
+      type: object
+      description: Complete issue entity stored in the database
+      required:
+        - id
+        - title
+        - description
+        - status
+        - category
+        - urgency
+        - aiAnalysis
+        - createdAt
+        - updatedAt
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Unique identifier of the issue
+          example: 3fa85f64-5717-4562-b3fc-2c963f66afa6
+        title:
+          type: string
+          description: Short title summarizing the issue
+          minLength: 3
+          maxLength: 200
+          example: Production checkout fails on credit card submission
+        description:
+          type: string
+          description: Free-text issue description submitted by user or reporter
+          minLength: 10
+          example: >-
+            When users attempt to submit payment on the checkout page, the request times out
+            after 30 seconds and returns a 504 gateway timeout. Customers are completely unable to complete purchases.
+        status:
+          $ref: '#/components/schemas/IssueStatus'
+        category:
+          $ref: '#/components/schemas/IssueCategory'
+        urgency:
+          $ref: '#/components/schemas/IssueUrgency'
+        aiAnalysis:
+          $ref: '#/components/schemas/AIAnalysis'
+        createdAt:
+          type: string
+          format: date-time
+          description: Timestamp when the issue was created
+          example: '2026-09-09T10:30:00.000Z'
+        updatedAt:
+          type: string
+          format: date-time
+          description: Timestamp when the issue was last updated
+          example: '2026-09-09T10:30:00.000Z'
+
+    CreateIssueRequest:
+      type: object
+      description: Request payload for submitting a new issue report
+      required:
+        - title
+        - description
+      properties:
+        title:
+          type: string
+          description: Summary title of the issue
+          minLength: 3
+          maxLength: 200
+          example: Production checkout fails on credit card submission
+        description:
+          type: string
+          description: Free-text description of the issue to be analyzed by AI
+          minLength: 10
+          example: >-
+            When users attempt to submit payment on the checkout page, the request times out
+            after 30 seconds and returns a 504 gateway timeout. Customers are completely unable to complete purchases.
+
+    IssueResponse:
+      type: object
+      description: Standard API envelope for a single issue response
+      required:
+        - success
+        - data
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          $ref: '#/components/schemas/Issue'
+
+    PaginationMeta:
+      type: object
+      description: Pagination metadata for list endpoints
+      required:
+        - total
+        - page
+        - limit
+        - totalPages
+        - hasNextPage
+        - hasPrevPage
+      properties:
+        total:
+          type: integer
+          description: Total number of matching items
+          example: 42
+        page:
+          type: integer
+          description: Current page index
+          example: 1
+        limit:
+          type: integer
+          description: Maximum items returned per page
+          example: 20
+        totalPages:
+          type: integer
+          description: Total number of pages
+          example: 3
+        hasNextPage:
+          type: boolean
+          description: Whether there is a next page
+          example: true
+        hasPrevPage:
+          type: boolean
+          description: Whether there is a previous page
+          example: false
+
+    IssueListResponse:
+      type: object
+      description: Standard API envelope for a paginated list of issues
+      required:
+        - success
+        - data
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          required:
+            - items
+            - pagination
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/Issue'
+            pagination:
+              $ref: '#/components/schemas/PaginationMeta'
+
+    ErrorDetail:
+      type: object
+      description: Specific field-level error detail
+      properties:
+        field:
+          type: string
+          description: Name of the invalid field (if applicable)
+          example: title
+        message:
+          type: string
+          description: Detailed explanation of the error
+          example: title must be at least 3 characters long
+
+    ErrorPayload:
+      type: object
+      description: Structured error content conforming to project error format
+      required:
+        - code
+        - message
+        - statusCode
+      properties:
+        code:
+          type: string
+          description: Error code identifier
+          example: VALIDATION_ERROR
+        message:
+          type: string
+          description: Human-readable error message
+          example: Invalid request payload. Title and description are required.
+        statusCode:
+          type: integer
+          description: HTTP status code
+          example: 400
+        details:
+          type: array
+          description: Additional error details or field validation issues
+          items:
+            $ref: '#/components/schemas/ErrorDetail'
+
+    ErrorResponse:
+      type: object
+      description: Standard API error envelope conforming to project standards
+      required:
+        - success
+        - error
+      properties:
+        success:
+          type: boolean
+          example: false
+        error:
+          $ref: '#/components/schemas/ErrorPayload'

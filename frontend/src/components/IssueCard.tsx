@@ -1,0 +1,128 @@
+'use client';
+
+import React, { useState } from 'react';
+import { Issue } from '../types/issue';
+import { CategoryBadge, ConfidenceBadge, StatusBadge, UrgencyBadge } from './IssueBadge';
+import { ChevronDown, ChevronUp, Clock, Lightbulb, Sparkles } from 'lucide-react';
+
+interface IssueCardProps {
+  issue: Issue;
+  className?: string;
+}
+
+export const IssueCard: React.FC<IssueCardProps> = ({ issue, className = '' }) => {
+  const [isExpanded, setIsExpanded] = useState(false);
+
+  const formatDate = (isoString: string) => {
+    try {
+      const date = new Date(isoString);
+      return new Intl.DateTimeFormat('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      }).format(date);
+    } catch {
+      return isoString;
+    }
+  };
+
+  return (
+    <div
+      className={`bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 sm:p-6 shadow-sm hover:shadow-md transition-shadow ${className}`}
+      data-testid={`issue-card-${issue.id}`}
+    >
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-3">
+        <div className="space-y-1">
+          <div className="flex flex-wrap items-center gap-2 mb-1.5">
+            <UrgencyBadge urgency={issue.urgency} />
+            <CategoryBadge category={issue.category} />
+            <StatusBadge status={issue.status} />
+            {issue.aiAnalysis?.confidenceScore !== undefined && (
+              <ConfidenceBadge score={issue.aiAnalysis.confidenceScore} />
+            )}
+          </div>
+          <h3 className="text-lg font-bold text-slate-900 dark:text-white leading-snug">
+            {issue.title}
+          </h3>
+        </div>
+
+        <div className="flex items-center text-xs text-slate-400 dark:text-slate-500 whitespace-nowrap shrink-0">
+          <Clock className="w-3.5 h-3.5 mr-1" />
+          <span>{formatDate(issue.createdAt)}</span>
+        </div>
+      </div>
+
+      <p className="text-sm text-slate-600 dark:text-slate-300 mb-4 whitespace-pre-line">
+        {issue.description}
+      </p>
+
+      {issue.aiAnalysis && (
+        <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800/80 bg-slate-50/70 dark:bg-slate-800/40 rounded-lg p-3.5">
+          <div className="flex items-start justify-between">
+            <div className="flex items-start space-x-2">
+              <Sparkles className="w-4 h-4 text-indigo-500 shrink-0 mt-0.5" />
+              <div>
+                <span className="text-xs font-semibold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">
+                  AI Summary
+                </span>
+                <p className="text-xs text-slate-700 dark:text-slate-300 mt-0.5 font-medium">
+                  {issue.aiAnalysis.summary}
+                </p>
+              </div>
+            </div>
+            {(issue.aiAnalysis.reasoning || issue.aiAnalysis.suggestedAction) && (
+              <button
+                type="button"
+                onClick={() => setIsExpanded(!isExpanded)}
+                className="text-xs font-medium text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 inline-flex items-center ml-2 shrink-0"
+                aria-expanded={isExpanded}
+                data-testid={`toggle-details-${issue.id}`}
+              >
+                {isExpanded ? (
+                  <>
+                    <span>Hide Details</span>
+                    <ChevronUp className="w-3.5 h-3.5 ml-1" />
+                  </>
+                ) : (
+                  <>
+                    <span>Details</span>
+                    <ChevronDown className="w-3.5 h-3.5 ml-1" />
+                  </>
+                )}
+              </button>
+            )}
+          </div>
+
+          {isExpanded && (
+            <div className="mt-3 pt-3 border-t border-slate-200/60 dark:border-slate-700/60 space-y-2.5 text-xs">
+              {issue.aiAnalysis.reasoning && (
+                <div>
+                  <span className="font-semibold text-slate-700 dark:text-slate-300">
+                    AI Reasoning:
+                  </span>
+                  <p className="text-slate-600 dark:text-slate-400 mt-0.5">
+                    {issue.aiAnalysis.reasoning}
+                  </p>
+                </div>
+              )}
+              {issue.aiAnalysis.suggestedAction && (
+                <div className="flex items-start space-x-1.5 text-amber-800 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/40 p-2.5 rounded border border-amber-200 dark:border-amber-900/50">
+                  <Lightbulb className="w-4 h-4 shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />
+                  <div>
+                    <span className="font-semibold">Suggested Remediation:</span>
+                    <p className="mt-0.5">{issue.aiAnalysis.suggestedAction}</p>
+                  </div>
+                </div>
+              )}
+              <div className="text-[11px] text-slate-400 dark:text-slate-500 pt-1">
+                ID: <code className="font-mono">{issue.id}</code>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
