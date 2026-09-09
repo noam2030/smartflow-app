@@ -70,3 +70,15 @@ Maintain strict separation of concerns between **Routes**, **Controllers**, and 
 - Abstract reusable components, helper functions, utility modules, and database queries.
 - Maintain shared types and schemas across client and server whenever applicable.
 - Extract common UI patterns into reusable Next.js / React components styled with TailwindCSS.
+
+---
+
+## 🌿 Git & Branching Policy
+
+- **CRITICAL:** Do **NOT** push directly to `main`.
+- For every change or feature:
+  1. Create a dedicated branch (e.g., `feat/<feature-name>`, `fix/<fix-name>`, or `chore/<task-name>`).
+  2. Commit your changes with descriptive, conventional commit messages.
+  3. Push the branch to `origin`.
+  4. Open a Pull Request (PR) for review before merging into `main`.
+
