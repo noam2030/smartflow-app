@@ -136,4 +136,48 @@ describe('AiAnalysisService', () => {
     expect(analysis.category).toBe('BUG');
     expect(analysis.priority).toBe('CRITICAL');
   });
+
+  it('retries with error feedback when initial response is invalid JSON, recovering on retry', async () => {
+    let callCount = 0;
+    const receivedPrompts: string[] = [];
+
+    const mockRecoveringGeminiClient: any = {
+      models: {
+        generateContent: async (params: any) => {
+          callCount++;
+          receivedPrompts.push(params.contents);
+
+          if (callCount === 1) {
+            // Attempt 1 returns non-JSON or malformed output
+            return { text: 'Sorry, I cannot format this as JSON properly.' };
+          }
+
+          // Attempt 2 returns valid JSON conforming to schema
+          return {
+            text: JSON.stringify({
+              category: 'SECURITY',
+              urgency: 'CRITICAL',
+              confidenceScore: 0.99,
+              summary: 'Critical unauthorized API access vulnerability detected.',
+              reasoning: 'Allows attackers to bypass auth middleware and access protected data.',
+              suggestedAction: 'Immediately rotate credentials and patch auth middleware.',
+            }),
+          };
+        },
+      },
+    };
+
+    const service = new AiAnalysisService(mockRecoveringGeminiClient);
+    const analysis = await service.analyze(
+      'Unauthorized access to admin API',
+      'Unauthenticated users can call /api/admin/users and export private records.'
+    );
+
+    expect(callCount).toBe(2);
+    expect(receivedPrompts.length).toBe(2);
+    expect(receivedPrompts[1]).toContain('Your previous response was rejected due to the following validation error');
+    expect(analysis.category).toBe('SECURITY');
+    expect(analysis.urgency).toBe('CRITICAL');
+    expect(analysis.confidenceScore).toBe(0.99);
+  });
 });

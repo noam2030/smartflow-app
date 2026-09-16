@@ -360,6 +360,40 @@ describe('Issues API Integration Tests', () => {
       expect(aliasBody.data.status).toBe('RESOLVED');
     });
 
+    it('accepts lowercase status values (open, in_progress, resolved) per issue-lifecycle.md spec', async () => {
+      const createRes = await app.inject({
+        method: 'POST',
+        url: '/api/issues',
+        payload: {
+          title: 'Memory leak in worker threads',
+          description: 'Thread pool fails to release resources after job execution completes.',
+        },
+      });
+      const created = JSON.parse(createRes.body).data;
+
+      const patchRes = await app.inject({
+        method: 'PATCH',
+        url: `/api/issues/${created.id}/status`,
+        payload: { status: 'in_progress' },
+      });
+
+      expect(patchRes.statusCode).toBe(200);
+      const patchBody = JSON.parse(patchRes.body);
+      expect(patchBody.success).toBe(true);
+      expect(patchBody.data.status).toBe('IN_PROGRESS');
+
+      // Update to resolved in lowercase
+      const resolveRes = await app.inject({
+        method: 'PATCH',
+        url: `/api/issues/${created.id}/status`,
+        payload: { status: 'resolved' },
+      });
+
+      expect(resolveRes.statusCode).toBe(200);
+      const resolveBody = JSON.parse(resolveRes.body);
+      expect(resolveBody.data.status).toBe('RESOLVED');
+    });
+
     it('returns 400 VALIDATION_ERROR when status value is invalid', async () => {
       const createRes = await app.inject({
         method: 'POST',
