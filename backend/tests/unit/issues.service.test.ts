@@ -137,4 +137,24 @@ describe('IssuesService', () => {
       service.updateIssueStatus('00000000-0000-0000-0000-000000000000', 'RESOLVED')
     ).rejects.toThrow(NotFoundError);
   });
+
+  it('deletes an existing issue successfully', async () => {
+    const created = await service.createIssue({
+      title: 'Issue to be deleted',
+      description: 'Temporary issue created to verify deletion logic.',
+    });
+
+    const deleteResult = await service.deleteIssue(created.id);
+    expect(deleteResult.id).toBe(created.id);
+    expect(deleteResult.deleted).toBe(true);
+
+    // Verifying it no longer exists
+    await expect(service.getIssueById(created.id)).rejects.toThrow(NotFoundError);
+  });
+
+  it('throws NotFoundError when attempting to delete non-existent issue', async () => {
+    await expect(
+      service.deleteIssue('00000000-0000-0000-0000-000000000000')
+    ).rejects.toThrow(NotFoundError);
+  });
 });

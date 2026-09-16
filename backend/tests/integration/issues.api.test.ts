@@ -445,4 +445,61 @@ describe('Issues API Integration Tests', () => {
       expect(body.error.code).toBe('ISSUE_NOT_FOUND');
     });
   });
+
+  describe('DELETE /api/issues/:id', () => {
+    it('deletes an existing issue successfully (200)', async () => {
+      const createRes = await app.inject({
+        method: 'POST',
+        url: '/api/issues',
+        payload: {
+          title: 'Issue to be deleted via API',
+          description: 'This issue will be deleted to verify the DELETE HTTP endpoint.',
+        },
+      });
+      const created = JSON.parse(createRes.body).data;
+
+      const deleteRes = await app.inject({
+        method: 'DELETE',
+        url: `/api/issues/${created.id}`,
+      });
+
+      expect(deleteRes.statusCode).toBe(200);
+      const deleteBody = JSON.parse(deleteRes.body);
+      expect(deleteBody.success).toBe(true);
+      expect(deleteBody.data.id).toBe(created.id);
+      expect(deleteBody.data.deleted).toBe(true);
+
+      // Verifying issue is no longer returned via GET
+      const getRes = await app.inject({
+        method: 'GET',
+        url: `/api/issues/${created.id}`,
+      });
+      expect(getRes.statusCode).toBe(404);
+    });
+
+    it('returns 400 INVALID_ID_FORMAT when ID is not a valid UUID', async () => {
+      const deleteRes = await app.inject({
+        method: 'DELETE',
+        url: '/api/issues/invalid-uuid',
+      });
+
+      expect(deleteRes.statusCode).toBe(400);
+      const body = JSON.parse(deleteRes.body);
+      expect(body.success).toBe(false);
+      expect(body.error.code).toBe('INVALID_ID_FORMAT');
+    });
+
+    it('returns 404 ISSUE_NOT_FOUND when ID does not exist', async () => {
+      const nonExistentId = '3fa85f64-5717-4562-b3fc-2c963f66afa6';
+      const deleteRes = await app.inject({
+        method: 'DELETE',
+        url: `/api/issues/${nonExistentId}`,
+      });
+
+      expect(deleteRes.statusCode).toBe(404);
+      const body = JSON.parse(deleteRes.body);
+      expect(body.success).toBe(false);
+      expect(body.error.code).toBe('ISSUE_NOT_FOUND');
+    });
+  });
 });

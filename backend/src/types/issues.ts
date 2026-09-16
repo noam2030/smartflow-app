@@ -70,6 +70,11 @@ export interface GetIssuesQuery {
   limit?: number;
 }
 
+export interface DeleteIssueResponseData {
+  id: string;
+  deleted: boolean;
+}
+
 export interface ErrorDetail {
   field?: string;
   message: string;

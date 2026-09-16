@@ -132,6 +132,35 @@ export const Dashboard: React.FC<DashboardProps> = ({
     }
   };
 
+  const handleDeleteIssue = async (issueId: string) => {
+    const previousIssues = [...issues];
+    const previousPagination = { ...pagination };
+
+    // Optimistic UI removal
+    setIssues((prev) => prev.filter((i) => i.id !== issueId));
+    setPagination((prev) => ({
+      ...prev,
+      total: Math.max(0, prev.total - 1),
+    }));
+
+    try {
+      await issueService.deleteIssue(issueId);
+      fetchIssues(filters);
+    } catch (err: unknown) {
+      // Rollback on error
+      setIssues(previousIssues);
+      setPagination(previousPagination);
+      const message =
+        err instanceof ApiError
+          ? err.message
+          : err instanceof Error
+          ? err.message
+          : 'Failed to delete issue.';
+      setError({ message });
+      throw err;
+    }
+  };
+
   // Quick stats computed from current items
   const stats = {
     total: pagination.total,
@@ -331,6 +360,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
               key={issue.id}
               issue={issue}
               onStatusChange={handleStatusChange}
+              onDelete={handleDeleteIssue}
             />
           ))}
 
