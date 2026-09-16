@@ -56,7 +56,7 @@ stateDiagram-v2
 
 ## 4. API Contract Alignment
 
-Status modifications are handled via the dedicated endpoint defined in [openapi.yaml](file:///Users/noam/Documents/AI/smartflow-app/docs/specs/openapi.yaml):
+Status modifications are handled via the dedicated endpoint defined in [openapi.yaml](./openapi.yaml):
 
 ### Endpoint: `PATCH /api/issues/{id}/status`
 

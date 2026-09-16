@@ -11,11 +11,11 @@ This document is the **Single Source of Truth (SSOT)** and central governance po
 > **MANDATORY PREREQUISITE BEFORE MAKING ANY CODE CHANGES:**
 > Every autonomous agent operating in this repository **MUST** read and adhere to the relevant specification and rule documents before proposing or implementing changes:
 >
-> 1. [`.agents/rules/code-style.md`](file:///Users/noam/Documents/AI/smartflow-app/.agents/rules/code-style.md) — Coding conventions, TypeScript standards, and 3-tier architectural layer separation.
-> 2. [`.agents/rules/testing.md`](file:///Users/noam/Documents/AI/smartflow-app/.agents/rules/testing.md) — Testing protocols (unit, integration, E2E) and verification commands.
-> 3. [`.agents/rules/ai-tagging.md`](file:///Users/noam/Documents/AI/smartflow-app/.agents/rules/ai-tagging.md) — Agentic loop for Gemini AI classification, JSON schema enforcement, and retry/fallback logic.
-> 4. [`docs/specs/openapi.yaml`](file:///Users/noam/Documents/AI/smartflow-app/docs/specs/openapi.yaml) — Official OpenAPI contract for all HTTP endpoints and data models.
-> 5. [`docs/specs/issue-lifecycle.md`](file:///Users/noam/Documents/AI/smartflow-app/docs/specs/issue-lifecycle.md) — Product specification governing issue statuses (`open`, `in_progress`, `resolved`) and allowed state transitions.
+> 1. [`.agents/rules/code-style.md`](.agents/rules/code-style.md) — Coding conventions, TypeScript standards, and 3-tier architectural layer separation.
+> 2. [`.agents/rules/testing.md`](.agents/rules/testing.md) — Testing protocols (unit, integration, E2E) and verification commands.
+> 3. [`.agents/rules/ai-tagging.md`](.agents/rules/ai-tagging.md) — Agentic loop for Gemini AI classification, JSON schema enforcement, and retry/fallback logic.
+> 4. [`docs/specs/openapi.yaml`](docs/specs/openapi.yaml) — Official OpenAPI contract for all HTTP endpoints and data models.
+> 5. [`docs/specs/issue-lifecycle.md`](docs/specs/issue-lifecycle.md) — Product specification governing issue statuses (`open`, `in_progress`, `resolved`) and allowed state transitions.
 
 ---
 
