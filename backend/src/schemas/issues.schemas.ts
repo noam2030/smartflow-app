@@ -13,7 +13,26 @@ export const issuePrioritySchema = z.enum(['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'])
 
 export const issueUrgencySchema = issuePrioritySchema;
 
-export const issueStatusSchema = z.enum(['OPEN', 'IN_PROGRESS', 'RESOLVED', 'CLOSED']);
+const ALLOWED_STATUSES = ['OPEN', 'IN_PROGRESS', 'RESOLVED', 'CLOSED'] as const;
+
+export const issueStatusSchema = z.preprocess(
+  (val) => (typeof val === 'string' ? val.toUpperCase() : val),
+  z.enum(ALLOWED_STATUSES, {
+    errorMap: () => ({
+      message: 'Status must be one of: open, in_progress, resolved (or OPEN, IN_PROGRESS, RESOLVED, CLOSED).',
+    }),
+  })
+);
+
+export const AIAnalysisSchema = z.object({
+  category: issueCategorySchema,
+  urgency: issueUrgencySchema,
+  priority: issuePrioritySchema.optional(),
+  confidenceScore: z.number().min(0.0).max(1.0),
+  summary: z.string().min(5).max(300),
+  reasoning: z.string().min(10).max(500),
+  suggestedAction: z.string().min(5).max(300),
+});
 
 export const createIssueSchema = z.object({
   title: z

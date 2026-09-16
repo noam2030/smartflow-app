@@ -1,6 +1,7 @@
 import { GoogleGenAI, Type } from '@google/genai';
 import type { AIAnalysis, IssueCategory, IssuePriority, IssueUrgency } from '../types/issues.js';
 import { AiAnalysisError } from '../errors/app-error.js';
+import { AIAnalysisSchema } from '../schemas/issues.schemas.js';
 
 export interface IAiAnalysisService {
   analyze(title: string, description: string): Promise<AIAnalysis>;
@@ -32,13 +33,10 @@ export class AiAnalysisService implements IAiAnalysisService {
       try {
         return await this.analyzeWithGemini(title, description, apiKey);
       } catch (err) {
-        if (err instanceof AiAnalysisError) {
-          throw err;
-        }
         if (process.env.AI_FALLBACK_ENABLED === 'false') {
-          throw new AiAnalysisError(
-            `External AI model failed to evaluate issue: ${(err as Error).message}`
-          );
+          throw err instanceof AiAnalysisError
+            ? err
+            : new AiAnalysisError(`External AI model failed to evaluate issue: ${(err as Error).message}`);
         }
         console.warn(
           `[SmartFlow AI] External Gemini model failed, using intelligent heuristic fallback: ${(err as Error).message}`
@@ -62,76 +60,137 @@ export class AiAnalysisService implements IAiAnalysisService {
     }
 
     const modelName = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
+    const maxRetries = 3;
+    const isTest = process.env.NODE_ENV === 'test' || Boolean(process.env.VITEST);
+    const baseDelay = isTest ? 1 : 500;
 
-    const prompt = `You are an issue triage assistant. Analyze this issue report:
+    let lastValidationError: string | null = null;
+
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        if (attempt > 1) {
+          const delay = baseDelay * Math.pow(2, attempt - 2);
+          await new Promise((resolve) => setTimeout(resolve, delay));
+        }
+
+        let prompt = `You are an expert software support and triage engineer for SmartFlow.
+Analyze the provided issue report:
 Title: "${title}"
 Description: "${description}"
 
-Classify into appropriate category and priority level.`;
+Taxonomy Rules:
+- category: one of ["BUG", "FEATURE_REQUEST", "PERFORMANCE", "SECURITY", "BILLING", "GENERAL_INQUIRY"]
+- urgency: one of ["LOW", "MEDIUM", "HIGH", "CRITICAL"]
+- confidenceScore: float between 0.0 and 1.0
+- summary: single concise summary sentence
+- reasoning: clear justification for the chosen category and urgency
+- suggestedAction: actionable next step for the engineering team
 
-    const response = await this.geminiClient.models.generateContent({
-      model: modelName,
-      contents: prompt,
-      config: {
-        responseMimeType: 'application/json',
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            category: {
-              type: Type.STRING,
-              enum: ['BUG', 'FEATURE_REQUEST', 'PERFORMANCE', 'SECURITY', 'BILLING', 'GENERAL_INQUIRY'],
+Output raw JSON only matching the schema.`;
+
+        if (lastValidationError) {
+          prompt = `Your previous response was rejected due to the following validation error:
+${lastValidationError}
+
+Please correct the error and return ONLY valid JSON matching the exact schema.
+
+${prompt}`;
+        }
+
+        const response = await this.geminiClient.models.generateContent({
+          model: modelName,
+          contents: prompt,
+          config: {
+            responseMimeType: 'application/json',
+            responseSchema: {
+              type: Type.OBJECT,
+              properties: {
+                category: {
+                  type: Type.STRING,
+                  enum: ['BUG', 'FEATURE_REQUEST', 'PERFORMANCE', 'SECURITY', 'BILLING', 'GENERAL_INQUIRY'],
+                },
+                urgency: {
+                  type: Type.STRING,
+                  enum: ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'],
+                },
+                priority: {
+                  type: Type.STRING,
+                  enum: ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'],
+                },
+                confidenceScore: {
+                  type: Type.NUMBER,
+                },
+                summary: {
+                  type: Type.STRING,
+                },
+                reasoning: {
+                  type: Type.STRING,
+                },
+                suggestedAction: {
+                  type: Type.STRING,
+                },
+              },
+              required: ['category', 'urgency', 'confidenceScore', 'summary', 'reasoning', 'suggestedAction'],
             },
-            priority: {
-              type: Type.STRING,
-              enum: ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'],
-            },
-            confidenceScore: {
-              type: Type.NUMBER,
-            },
-            summary: {
-              type: Type.STRING,
-            },
-            reasoning: {
-              type: Type.STRING,
-            },
-            suggestedAction: {
-              type: Type.STRING,
-            },
+            systemInstruction:
+              'You are an intelligent software issue classification model for SmartFlow. Return only valid JSON conforming strictly to the responseSchema.',
           },
-          required: ['category', 'priority', 'confidenceScore', 'summary', 'reasoning', 'suggestedAction'],
-        },
-        systemInstruction:
-          'You are an intelligent software issue classification model for SmartFlow. Return only valid JSON conforming strictly to the responseSchema.',
-      },
-    });
+        });
 
-    const responseText = response.text;
-    if (!responseText) {
-      throw new AiAnalysisError('External AI model returned empty content.');
+        const responseText = response.text;
+        if (!responseText) {
+          throw new Error('External AI model returned empty content.');
+        }
+
+        let parsed: any;
+        try {
+          parsed = JSON.parse(responseText);
+        } catch (jsonErr: any) {
+          throw new Error(`Invalid JSON output: ${jsonErr.message}`);
+        }
+
+        // Support priority if urgency is not explicitly supplied in legacy responses
+        if (!parsed.urgency && parsed.priority) {
+          parsed.urgency = parsed.priority;
+        }
+
+        // Validate strictly with AIAnalysisSchema (Zod)
+        const validationResult = AIAnalysisSchema.safeParse(parsed);
+        if (!validationResult.success) {
+          const formattedErrors = validationResult.error.issues
+            .map((issue) => `${issue.path.join('.')}: ${issue.message}`)
+            .join('; ');
+          throw new Error(`Schema validation failure: ${formattedErrors}`);
+        }
+
+        const validated = validationResult.data;
+        const category = validated.category as IssueCategory;
+        const urgency = validated.urgency as IssueUrgency;
+        const priority = (validated.priority || urgency) as IssuePriority;
+        const rawScore = typeof validated.confidenceScore === 'number' ? validated.confidenceScore : 0.95;
+        const confidenceScore = Math.min(1.0, Math.max(0.0, Math.round(rawScore * 100) / 100));
+
+        return {
+          category,
+          priority,
+          urgency,
+          confidenceScore,
+          summary: validated.summary,
+          reasoning: validated.reasoning,
+          suggestedAction: validated.suggestedAction,
+        };
+      } catch (attemptErr: any) {
+        lastValidationError = attemptErr.message;
+        console.warn(`[SmartFlow AI] Attempt ${attempt}/${maxRetries} failed: ${lastValidationError}`);
+        if (attempt === maxRetries) {
+          throw new AiAnalysisError(
+            `AI agentic triage loop failed after ${maxRetries} retry attempts: ${lastValidationError}`
+          );
+        }
+      }
     }
 
-    let parsed: any;
-    try {
-      parsed = JSON.parse(responseText);
-    } catch {
-      throw new AiAnalysisError('External AI model returned non-JSON response.');
-    }
-
-    const category = parsed.category as IssueCategory;
-    const priority = parsed.priority as IssuePriority;
-    const urgency = priority;
-    const rawScore = typeof parsed.confidenceScore === 'number' ? parsed.confidenceScore : 0.95;
-    const confidenceScore = Math.min(1.0, Math.max(0.0, Math.round(rawScore * 100) / 100));
-
-    return {
-      category,
-      priority,
-      urgency,
-      confidenceScore,
-      summary: parsed.summary || `${priority} ${category}: ${title}`,
-      reasoning: parsed.reasoning || `Classified by external AI model (${modelName}).`,
-      suggestedAction: parsed.suggestedAction || 'Assign to triage squad.',
-    };
+    throw new AiAnalysisError('AI classification loop failed.');
   }
 
   private analyzeWithHeuristics(title: string, description: string, combinedText: string): AIAnalysis {

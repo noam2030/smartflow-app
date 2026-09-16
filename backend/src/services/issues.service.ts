@@ -8,7 +8,7 @@ import type {
   IssueStatus,
   PaginationMeta,
 } from '../types/issues.js';
-import { NotFoundError } from '../errors/app-error.js';
+import { NotFoundError, ValidationError } from '../errors/app-error.js';
 import { AiAnalysisService, type IAiAnalysisService } from './ai-analysis.service.js';
 
 export interface IIssuesService {
@@ -194,9 +194,28 @@ export class IssuesService implements IIssuesService {
     return this.mapRowToIssue(row);
   }
 
-  async updateIssueStatus(id: string, status: IssueStatus): Promise<Issue> {
-    // Verify issue exists first
-    await this.getIssueById(id);
+  isValidStatusTransition(currentStatus: IssueStatus, nextStatus: IssueStatus): boolean {
+    if (currentStatus === nextStatus) return true;
+
+    const allowedTransitions: Record<IssueStatus, IssueStatus[]> = {
+      OPEN: ['IN_PROGRESS', 'RESOLVED', 'CLOSED'],
+      IN_PROGRESS: ['RESOLVED', 'OPEN', 'CLOSED'],
+      RESOLVED: ['OPEN', 'IN_PROGRESS', 'CLOSED'],
+      CLOSED: ['OPEN', 'RESOLVED', 'IN_PROGRESS'],
+    };
+
+    return allowedTransitions[currentStatus]?.includes(nextStatus) ?? false;
+  }
+
+  async updateIssueStatus(id: string, rawStatus: IssueStatus | string): Promise<Issue> {
+    const currentIssue = await this.getIssueById(id);
+    const status = (typeof rawStatus === 'string' ? rawStatus.toUpperCase() : rawStatus) as IssueStatus;
+
+    if (!this.isValidStatusTransition(currentIssue.status, status)) {
+      throw new ValidationError(
+        `Cannot transition issue status from ${currentIssue.status} to ${status}.`
+      );
+    }
 
     const now = new Date().toISOString();
     const stmt = this.db.prepare(`
