@@ -170,4 +170,36 @@ export const issueService = {
     const issueResponse = data as IssueResponse;
     return issueResponse.data;
   },
+
+  /**
+   * Delete an issue by ID.
+   * Sends a DELETE request to /api/issues/:id.
+   */
+  async deleteIssue(id: string): Promise<{ id: string; deleted: boolean }> {
+    const baseUrl = getApiBaseUrl();
+    const url = `${baseUrl}/api/issues/${encodeURIComponent(id)}`;
+
+    const response = await fetch(url, {
+      method: 'DELETE',
+      headers: {
+        Accept: 'application/json',
+      },
+    });
+
+    const data = await response.json().catch(() => null);
+
+    if (!response.ok) {
+      if (data && 'error' in data) {
+        const errorRes = data as ErrorResponse;
+        throw new ApiError(errorRes.error);
+      }
+      throw new ApiError({
+        code: 'HTTP_ERROR',
+        message: response.statusText || `Request failed with status ${response.status}`,
+        statusCode: response.status,
+      });
+    }
+
+    return data.data;
+  },
 };

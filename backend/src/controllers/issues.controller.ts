@@ -55,4 +55,15 @@ export class IssuesController {
       data: issue,
     });
   };
+
+  deleteIssue = async (
+    request: FastifyRequest<{ Params: { id: string } }>,
+    reply: FastifyReply
+  ) => {
+    const result = await this.issuesService.deleteIssue(request.params.id);
+    return reply.status(200).send({
+      success: true,
+      data: result,
+    });
+  };
 }

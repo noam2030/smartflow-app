@@ -327,6 +327,73 @@ paths:
                   statusCode: 500
                   details: []
 
+    delete:
+      tags:
+        - Issues
+      summary: Delete an issue by ID
+      description: Permanently deletes a specific issue report from the database.
+      operationId: deleteIssue
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Unique identifier of the issue (UUID)
+          schema:
+            type: string
+            format: uuid
+          example: 3fa85f64-5717-4562-b3fc-2c963f66afa6
+      responses:
+        '200':
+          description: Issue successfully deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeleteIssueResponse'
+              example:
+                success: true
+                data:
+                  id: 3fa85f64-5717-4562-b3fc-2c963f66afa6
+                  deleted: true
+        '400':
+          description: Invalid ID format
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                success: false
+                error:
+                  code: INVALID_ID_FORMAT
+                  message: The provided issue ID must be a valid UUID.
+                  statusCode: 400
+                  details: []
+        '404':
+          description: Issue not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                success: false
+                error:
+                  code: ISSUE_NOT_FOUND
+                  message: Issue with ID '3fa85f64-5717-4562-b3fc-2c963f66afa6' was not found.
+                  statusCode: 404
+                  details: []
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                success: false
+                error:
+                  code: INTERNAL_SERVER_ERROR
+                  message: An unexpected error occurred while deleting the issue.
+                  statusCode: 500
+                  details: []
+
   /api/issues/{id}/status:
     patch:
       tags:
@@ -648,3 +715,27 @@ components:
           example: false
         error:
           $ref: '#/components/schemas/ErrorPayload'
+
+    DeleteIssueResponse:
+      type: object
+      description: Standard API envelope for issue deletion confirmation
+      required:
+        - success
+        - data
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          required:
+            - id
+            - deleted
+          properties:
+            id:
+              type: string
+              format: uuid
+              example: 3fa85f64-5717-4562-b3fc-2c963f66afa6
+            deleted:
+              type: boolean
+              example: true

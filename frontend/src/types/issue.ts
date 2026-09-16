@@ -62,6 +62,14 @@ export interface IssueResponse {
   data: Issue;
 }
 
+export interface DeleteIssueResponse {
+  success: boolean;
+  data: {
+    id: string;
+    deleted: boolean;
+  };
+}
+
 export interface ErrorDetail {
   field?: string;
   message: string;

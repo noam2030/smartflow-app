@@ -2,6 +2,7 @@ import crypto from 'node:crypto';
 import type { DatabaseSync } from 'node:sqlite';
 import type {
   CreateIssueRequest,
+  DeleteIssueResponseData,
   GetIssuesQuery,
   Issue,
   IssueListResponseData,
@@ -16,6 +17,7 @@ export interface IIssuesService {
   getIssues(query: GetIssuesQuery): Promise<IssueListResponseData>;
   getIssueById(id: string): Promise<Issue>;
   updateIssueStatus(id: string, status: IssueStatus): Promise<Issue>;
+  deleteIssue(id: string): Promise<DeleteIssueResponseData>;
 }
 
 interface IssueRow {
@@ -227,6 +229,16 @@ export class IssuesService implements IIssuesService {
     stmt.run(status, now, id);
 
     return this.getIssueById(id);
+  }
+
+  async deleteIssue(id: string): Promise<DeleteIssueResponseData> {
+    // Verify issue exists first (throws NotFoundError if not found)
+    await this.getIssueById(id);
+
+    const stmt = this.db.prepare('DELETE FROM issues WHERE id = ?');
+    stmt.run(id);
+
+    return { id, deleted: true };
   }
 
   private mapRowToIssue(row: IssueRow): Issue {

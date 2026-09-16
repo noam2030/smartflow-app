@@ -240,4 +240,46 @@ describe('issueService', () => {
       await expect(issueService.updateIssueStatus('non-existent-id', 'RESOLVED')).rejects.toThrow(ApiError);
     });
   });
+
+  describe('deleteIssue', () => {
+    it('sends DELETE request to /api/issues/:id and returns deleted confirmation', async () => {
+      global.fetch = jest.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          success: true,
+          data: {
+            id: mockIssue.id,
+            deleted: true,
+          },
+        }),
+      });
+
+      const result = await issueService.deleteIssue(mockIssue.id);
+
+      expect(global.fetch).toHaveBeenCalledTimes(1);
+      const [calledUrl, calledOptions] = (global.fetch as jest.Mock).mock.calls[0];
+      expect(calledUrl).toBe(`/api/issues/${mockIssue.id}`);
+      expect(calledOptions.method).toBe('DELETE');
+      expect(calledOptions.headers.Accept).toBe('application/json');
+      expect(result).toEqual({ id: mockIssue.id, deleted: true });
+    });
+
+    it('throws ApiError when DELETE request fails with 404', async () => {
+      global.fetch = jest.fn().mockResolvedValue({
+        ok: false,
+        status: 404,
+        json: async () => ({
+          success: false,
+          error: {
+            code: 'NOT_FOUND',
+            message: 'Issue with id 3fa85f64-5717-4562-b3fc-2c963f66afa6 not found',
+            statusCode: 404,
+          },
+        }),
+      });
+
+      await expect(issueService.deleteIssue('3fa85f64-5717-4562-b3fc-2c963f66afa6')).rejects.toThrow(ApiError);
+    });
+  });
 });

@@ -134,4 +134,26 @@ export const issuesRoutes: FastifyPluginAsync<IssuesRoutesOptions> = async (
     },
     controller.updateIssueStatus
   );
+
+  // DELETE /api/issues/:id
+  fastify.delete(
+    '/api/issues/:id',
+    {
+      preValidation: async (request) => {
+        const result = getIssueParamsSchema.safeParse(request.params);
+        if (!result.success) {
+          const details = result.error.issues.map((i) => ({
+            field: i.path.join('.'),
+            message: i.message,
+          }));
+          throw new InvalidIdFormatError(
+            'The provided issue ID must be a valid UUID.',
+            details
+          );
+        }
+        request.params = result.data;
+      },
+    },
+    controller.deleteIssue
+  );
 };

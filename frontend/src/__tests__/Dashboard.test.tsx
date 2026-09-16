@@ -199,4 +199,61 @@ describe('Dashboard Component', () => {
       expect(statusSelect).toHaveValue('RESOLVED');
     });
   });
+
+  it('handles issue deletion with confirmation', async () => {
+    const user = userEvent.setup();
+    (issueService.getIssues as jest.Mock)
+      .mockResolvedValueOnce({
+        items: [...mockIssues],
+        pagination: {
+          total: 2,
+          page: 1,
+          limit: 10,
+          totalPages: 1,
+          hasNextPage: false,
+          hasPrevPage: false,
+        },
+      })
+      .mockResolvedValueOnce({
+        items: [mockIssues[1]],
+        pagination: {
+          total: 1,
+          page: 1,
+          limit: 10,
+          totalPages: 1,
+          hasNextPage: false,
+          hasPrevPage: false,
+        },
+      });
+
+    (issueService.deleteIssue as jest.Mock).mockResolvedValue({
+      id: 'issue-1',
+      deleted: true,
+    });
+
+    render(<Dashboard />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Production checkout fails on credit card submission')).toBeInTheDocument();
+    });
+
+    // Click the delete icon button for issue-1
+    const deleteBtn = screen.getByTestId('delete-button-issue-1');
+    await user.click(deleteBtn);
+
+    // Confirmation options should appear
+    expect(screen.getByTestId('confirm-delete-issue-1')).toBeInTheDocument();
+    expect(screen.getByTestId('cancel-delete-issue-1')).toBeInTheDocument();
+
+    // Confirm deletion
+    await user.click(screen.getByTestId('confirm-delete-issue-1'));
+
+    expect(issueService.deleteIssue).toHaveBeenCalledWith('issue-1');
+
+    // Issue-1 should be removed from the list, issue-2 should still exist
+    await waitFor(() => {
+      expect(screen.queryByText('Production checkout fails on credit card submission')).not.toBeInTheDocument();
+    });
+    expect(screen.getByText('Add dark mode theme support')).toBeInTheDocument();
+  });
 });
